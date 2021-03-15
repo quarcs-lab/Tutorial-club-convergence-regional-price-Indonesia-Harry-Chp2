@@ -1,0 +1,337 @@
+---
+title: "Club convergence of regional price in 34 Indonesian provinces"
+author: "Harry Aginta"
+output:
+  html_notebook:
+    code_folding: show
+    highlight: monochrome
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 4
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+  pdf_document: default
+  html_document:
+    code_download: true
+    df_print: paged
+    toc: true
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 4
+    number_sections: true
+    code_folding: "show"
+    theme: "cosmo"
+    highlight: "monochrome"
+  word_document: default
+---
+
+```{r}
+#install.packages("ConvergenceClubs")
+#install.packages("mFilter")
+#install.packages("data.table")
+#install.packages("plyr")
+#install.packages("tidyverse")
+#install.packages("tibble")
+#install.packages("janitor")
+#install.packages("oglmx") # For ordered logit model in R
+#install.packages("rms") # # For ordered logit model in R too as an alternative
+library(ConvergenceClubs)
+library(mFilter)
+library(tidyverse)
+library(tibble)
+library(data.table)
+library(plyr)
+library(dplyr)
+library(janitor)
+library(oglmx)
+library(rms)
+```
+
+### Load the data
+```{r}
+cpi <- rio::import("https://github.com/quarcs-lab/Tutorial-club-convergence-regional-price-Indonesia_Harry-Ch2/blob/main/data/CPI_province.xlsx?raw=true")
+cpi
+```
+
+```{r}
+glimpse(cpi)
+```
+
+### Remove ID column from data
+```{r}
+cpi <- subset(cpi, select = -1)
+```
+
+
+# Part A: Visualize CPI all provinces
+## Reshape to long df 
+```{r}
+cpi_long <- cpi %>% 
+  pivot_longer(-Province, names_to = "date", values_to = "cpi") 
+cpi_long
+```
+## Convert numeric date from Excel to date R
+```{r}
+cpi_long$date <- excel_numeric_to_date(as.numeric(as.character(cpi_long$date)), date_system = "modern")
+cpi_long
+```
+
+
+## Boxplot by Province
+```{r}
+boxplot.cpi <- ggplot(cpi_long, aes(x = Province, y = cpi))
+boxplot.cpi + geom_boxplot() + ggtitle("CPI by Province") +
+  xlab("") + ylab("CPI") + theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank()) + theme(axis.text.x = element_text(size = rel(1), angle = 90, hjust = 1))
+#ggsave("boxplot_cpi.png") #Save the boxplot in .png
+```
+
+
+## Plot CPIs using ggplot
+```{r}
+graph <- cpi_long %>%
+ggplot(aes(x = date, y = cpi, color=Province)) +
+geom_line(size=1) +
+labs(subtitle = "Consumer Price Index",
+x = "Time",
+y = "CPI", color="") +
+theme(text=element_text( family="Palatino")) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black")) 
+  guides(col = guide_legend(nrow = 8))
+graph
+#ggsave("graph_cpi.png") #Save the graph in .png
+```
+
+
+# Part B: Club convergence
+## Reshape data from long to wide. The club convergence package requires datafarame in wide format.
+```{r}
+cpi_wide <- cpi_long %>%
+  pivot_wider(names_from = date, values_from = cpi)
+cpi_wide
+```
+
+## Transform CPI to log and then remove short-run fluctuation using HP filter
+```{r}
+logcpi <- log(cpi_wide[,-1])
+```
+
+
+```{r}
+filteredcpi <- apply(logcpi, 1, 
+function(x){mFilter::hpfilter(x, freq=14400, type="lambda")$trend} ) 
+filteredcpi <- data.frame(Province = cpi[,1], t(filteredcpi), stringsAsFactors=FALSE ) 
+colnames(filteredcpi) <- colnames(cpi_wide) 
+filteredcpi
+```
+
+## Apply the log-t-test
+```{r}
+H <- computeH(filteredcpi[,-1], quantity = "H")
+round(estimateMod(H, time_trim=0.333, HACmethod = "FQSB"), 3)
+```
+
+Ho: There is overall convergence. We can reject Ho given beta coefficient is negative and the tvalue is smaller than -1.65.
+Then we proceed to identify convergence clubs.
+
+
+## Identify clubs
+```{r}
+clubs <- findClubs(filteredcpi, dataCols=2:97, unit_names = 1, refCol=97,
+time_trim=0.333, cstar=0, HACmethod = 'FQSB')
+```
+
+```{r}
+summary(clubs)
+```
+
+```{r}
+print(clubs)
+```
+
+```{r}
+plot(clubs)
+```
+
+```{r}
+plot(clubs, clubs=NULL, avgTP = TRUE, legend=TRUE)
+```
+NOTE: We observe 5 club convergence.
+
+
+## Merge clubs
+```{r}
+mclubs <- mergeClubs(clubs, mergeMethod='PS')
+```
+
+```{r}
+summary(mclubs)
+```
+
+```{r}
+mclubs
+```
+
+```{r}
+plot(mclubs)
+```
+
+  
+```{r}
+plot(mclubs, clubs=NULL, avgTP = TRUE, legend=TRUE)
+```
+NOTE: We observe 4 final club convergence, where club 2 and 3 merge.
+
+
+# Part C: Visualize the transition path of club convergence
+## Convert the "mclubs" object from list to dataframe.
+
+```{r}
+class(mclubs)
+```
+
+```{r}
+table.mclubs <- map(mclubs, as.data.table)
+df.mclubs <- rbindlist(table.mclubs, fill = T, idcol = T)
+df.mclubs
+```
+
+## Change the the name of the 1st and 5th column from to "Clubs" and "Province"
+```{r}
+colnames(df.mclubs)[c(1,5)] <- c("Club","Province")
+df.mclubs
+```
+
+## Merge "df.mclubs" with "filteredcpi" to get the filtered CPI data of all provinces 
+```{r}
+cpi.club <- as.data.frame(
+  inner_join(filteredcpi, df.mclubs, by="Province") %>% 
+  select(-contains(c("clubs","id","model")))
+  ) 
+cpi.club
+```
+
+## Generate the list of relative CPI
+```{r}
+rel.cpi <- list()
+for(a in 2:97) {
+  rel.cpi[[a]] <- data.frame(cpi.club$Province, cpi.club[,a]/mean(cpi.club[,a]))
+colnames(rel.cpi[[a]])[1]<- "Province"
+colnames(rel.cpi[[a]])[2]<- 
+paste("rel",colnames(cpi.club)[a],sep="_")
+}
+
+for (x in 2:96) {
+  rel.cpi[[x+1]]<-left_join(rel.cpi[[x]],rel.cpi[[x+1]], by="Province")
+}
+```
+
+## Convert the list to dataframe
+```{r}
+table.rel.cpi <- map(rel.cpi, as.data.table)
+df.rel.cpi <- rbindlist(table.rel.cpi, fill = T, idcol = T) %>% drop_na()
+
+df.rel.cpi <- join(df.rel.cpi,cpi.club,by=c('Province')) %>% 
+  select(Province,contains("rel"),Club)
+  
+df.rel.cpi <- as.data.frame(df.rel.cpi)
+df.rel.cpi
+```
+
+## Remove "rel_" string from colums' name to retain only date
+```{r}
+colnames(df.rel.cpi) <- gsub("rel_","",colnames(df.rel.cpi))
+df.rel.cpi
+```
+
+## Transpose to long format data for ggplot
+```{r}
+df.rel.cpi.long <- df.rel.cpi %>%  pivot_longer(-c(Province,Club), names_to = "Time", values_to="Rel_CPI")
+df.rel.cpi.long
+```
+
+## Compute the relative values by clubs for each month and remove observation in 2012 to exclude index base year in the plot.
+```{r}
+df.rel.cpi.path <- aggregate(Rel_CPI ~ Club + Time, df.rel.cpi.long, mean) 
+df.rel.cpi.path <- df.rel.cpi.path[-c(1:48), ]
+df.rel.cpi.path$Time <- as.Date(as.character(df.rel.cpi.path$Time))
+df.rel.cpi.path
+```
+```{r}
+path_all <- df.rel.cpi.path %>% 
+  ggplot(aes(x=Time,y=Rel_CPI, group=Club, col=Club)) + geom_line() +
+  labs(title = "Transition path of all clubs") +
+  theme_bw()
+path_all
+#ggsave("path_all.png") #save the graph in .png
+```
+
+# Part D: Investigate the influcencing factors of club convergence using ordered logit model
+## Load the data
+```{r}
+ologit <- read_csv("https://raw.githubusercontent.com/quarcs-lab/Tutorial-club-convergence-regional-price-Indonesia_Harry-Ch2/main/data/ologit.csv")
+ologit
+```
+
+```{r}
+library(readr)
+ologit <- read_delim("https://raw.githubusercontent.com/quarcs-lab/Tutorial-club-convergence-regional-price-Indonesia_Harry-Ch2/main/data/ologit.csv", 
+    ";", escape_double = FALSE, trim_ws = TRUE)
+ologit
+```
+
+
+## Generate new variable of log(labor productivity)
+```{r}
+ologit <- ologit %>% 
+mutate("lnlbr_prod" = log(lbr_prod))
+ologit
+```
+
+## Order the categorical club to get "the higher club_status, the higher CPI club".
+```{r}
+ologit$club_status <- 4
+ologit$club_status[ologit$ID_Club == 2] <- 3
+ologit$club_status[ologit$ID_Club == 3] <- 2
+ologit$club_status[ologit$ID_Club == 4] <- 1
+ologit
+```
+
+## Define Y and X variables
+```{r}
+attach(ologit)
+Y <- cbind(club_status)
+X <- cbind(lnlbr_prod, backinf, spainfquepoly19, pcons_g, gexp_g)
+Xvar <- c("lnlbr_prod", "backinf", "spainfquepoly19", "pcons_g", "gexp_g")
+```
+NOTE: 
+"lnlbr_prod" = log of labor productivity
+"backinf" = backward inflation expectation
+"spainfquepoly19" = spatial lag of inflation
+"pcons_g" = growth of personal consumption
+"gexp_g" = growth of government expenditure. 
+
+
+## Run ordered logit model using ologit.reg command in oglmx package
+```{r}
+model.logit <- ologit.reg(Y ~ X, data = ologit)
+summary(model.logit)
+```
+
+## Run ordered logit model using lrm command in rms package
+```{r}
+ddist <- datadist(Xvar)
+options(datadist="ddist")
+```
+
+```{r}
+m <- lrm(Y ~ X, data = ologit)
+print(m)
+```
