@@ -7,4 +7,4 @@ The project includes the codes to generate:
 - the transition path graph, and
 - results of ordered logit model to investigate the conditioning factors of
 club convergence.
-Please find the project here: https://rstudio.cloud/project/2306165
+Please find the project here: [RStudio Cloud](https://rstudio.cloud/project/2306165)
