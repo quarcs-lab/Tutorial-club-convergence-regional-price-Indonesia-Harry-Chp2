@@ -276,17 +276,11 @@ path_all
 # Part D: Investigate the influcencing factors of club convergence using ordered logit model
 ## Load the data
 ```{r}
-ologit <- read_csv("https://raw.githubusercontent.com/quarcs-lab/Tutorial-club-convergence-regional-price-Indonesia_Harry-Ch2/main/data/ologit.csv")
-ologit
-```
-
-```{r}
 library(readr)
 ologit <- read_delim("https://raw.githubusercontent.com/quarcs-lab/Tutorial-club-convergence-regional-price-Indonesia_Harry-Ch2/main/data/ologit.csv", 
     ";", escape_double = FALSE, trim_ws = TRUE)
 ologit
 ```
-
 
 ## Generate new variable of log(labor productivity)
 ```{r}
