@@ -106,7 +106,7 @@ theme(text=element_text( family="Palatino")) + theme(panel.grid.major = element_
 panel.background = element_blank(), axis.line = element_line(colour = "black")) 
   guides(col = guide_legend(nrow = 8))
 graph
-#ggsave("graph_cpi.png") #Save the graph in .png
+#ggsave("graph_cpi.png", width = 9, height = 5) #Save the graph in .png
 ```
 
 
