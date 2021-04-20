@@ -8,7 +8,7 @@ The project includes the codes to generate:
 - results of ordered logit model to investigate the conditioning factors of
 club convergence.
 
-The published paper is here: [Asia-Pacific Journal of Regional Science](https://link.springer.com/article/10.1007/s41685-020-00178-0)
+The published paper is here: [Asia-Pacific Journal of Regional Science](https://link.springer.com/epdf/10.1007/s41685-020-00178-0?sharing_token=Udh0A8utbz3UOXNNGKiSV_e4RwlQNchNByi7wbcMAY7bB1iC4y4uuFDI6nTT1kNVAYUrdoMPHQAPOAZSLEOod6yEPnIPwNBpii90t2hYh304-QH8ZzcPwBDV5AfhfBfJC2AQtwTnfhqhAGVTZnO6aCPjNpkF9Sj6MgHAJ4GuOLY%3D)
 
 Please also find this tutorial in a project here: [RStudio Cloud](https://rstudio.cloud/project/2306165)
 
